@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-AMZ_LINUX_VERSION:=latest
+#AMZ_LINUX_VERSION:=latest
+AMZ_LINUX_VERSION := 2018.03
 current_dir := $(shell pwd)
 container_dir := /opt/app
 circleci := ${CIRCLECI}
@@ -20,7 +21,8 @@ circleci := ${CIRCLECI}
 all: archive
 
 clean:
-	rm -rf compile/lambda.zip
+	#failing for local permissions
+	#rm -rf build/lambda.zip
 
 archive: clean
 ifeq ($(circleci), true)
