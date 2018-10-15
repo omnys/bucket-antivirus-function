@@ -54,6 +54,8 @@ def verify_s3_object_version(s3_object):
             raise Exception("Object versioning is not enabled in bucket %s" % s3_object.bucket_name)
 
 def download_s3_object(s3_object, local_prefix):
+    print("Downloading from s3 object %s\n" %
+          s3_object.bucket_name)
     local_path = "%s/%s/%s" % (local_prefix, s3_object.bucket_name, s3_object.key)
     create_dir(os.path.dirname(local_path))
     s3_object.download_file(local_path)

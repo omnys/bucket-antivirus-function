@@ -28,6 +28,7 @@ def current_library_search_path():
 
 
 def update_defs_from_s3(bucket, prefix):
+    print("Starting definitions update: bucket %s prefix %s" % (bucket, prefix))
     create_dir(AV_DEFINITION_PATH)
     for filename in AV_DEFINITION_FILENAMES:
         s3_path = os.path.join(AV_DEFINITION_S3_PREFIX, filename)
@@ -39,6 +40,8 @@ def update_defs_from_s3(bucket, prefix):
         if s3_md5:
             print("Downloading definition file %s from s3://%s" % (filename, os.path.join(bucket, prefix)))
             s3.Bucket(bucket).download_file(s3_path, local_path)
+        else:
+            print("Skipped download for definition file %s" % filename)
 
 
 def upload_defs_to_s3(bucket, prefix, local_path):
@@ -96,13 +99,17 @@ def md5_from_s3_tags(bucket, key):
         tags = s3_client.get_object_tagging(Bucket=bucket, Key=key)["TagSet"]
     except botocore.exceptions.ClientError as e:
         expected_errors = {'404', 'AccessDenied', 'NoSuchKey'}
+        print("Error from md5sum on s3 for key %s: %s" % (key, e.response['Error']['Code']) )
         if e.response['Error']['Code'] in expected_errors:
+            print("It was an expected error")
             return ""
         else:
+            print("Raise exception")
             raise
     for tag in tags:
         if tag["Key"] == "md5":
             return tag["Value"]
+    print("No md5 tag key found")
     return ""
 
 
