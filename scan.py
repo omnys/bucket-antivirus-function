@@ -33,6 +33,13 @@ def event_object(event):
         raise Exception("Unable to retrieve object from event.")
     return s3.Object(bucket, key)
 
+def get_S3_object(bucket, key):
+    key = urllib.unquote_plus(key.encode('utf8'))
+    if (not bucket) or (not key):
+        print("Unable to retrieve object bucket %s key %s.\n%s" % (bucket, key))
+        raise Exception("Unable to retrieve object")
+    return s3.Object(bucket, key)
+
 def verify_s3_object_version(s3_object):
     # validate that we only process the original version of a file, if asked to do so
     # security check to disallow processing of a new (possibly infected) object version
@@ -53,9 +60,10 @@ def verify_s3_object_version(s3_object):
             print("Unable to implement check for original version, as versioning is not enabled in bucket %s" % s3_object.bucket_name)
             raise Exception("Object versioning is not enabled in bucket %s" % s3_object.bucket_name)
 
+
 def download_s3_object(s3_object, local_prefix):
-    print("Downloading from s3 object %s\n" %
-          s3_object.bucket_name)
+    print("Downloading from s3 bucket %s key %s\n" %
+          (s3_object.bucket_name, s3_object.key))
     local_path = "%s/%s/%s" % (local_prefix, s3_object.bucket_name, s3_object.key)
     create_dir(os.path.dirname(local_path))
     s3_object.download_file(local_path)
@@ -93,6 +101,20 @@ def set_av_tags(s3_object, result):
         Key=s3_object.key,
         Tagging={"TagSet": new_tags}
     )
+
+
+def check_av_tag(bucket_name, obj_key):
+    curr_tags = s3_client.get_object_tagging(Bucket=bucket_name, Key=obj_key)["TagSet"]
+    new_tags = copy.copy(curr_tags)
+    for tag in curr_tags:
+        if tag["Key"] in [AV_STATUS_METADATA, AV_TIMESTAMP_METADATA]:
+            return True
+    return False
+
+
+def check_av_tag_from_obj(s3_object):
+    return check_av_tag(s3_object.bucket_name, s3_object.key)
+
 
 def sns_start_scan(s3_object):
     if AV_SCAN_START_SNS_ARN is None:
@@ -155,3 +177,48 @@ def lambda_handler(event, context):
 
 def str_to_bool(s):
     return bool(strtobool(str(s)))
+
+def lambda_handler_process_all_bucket_objects(event, context):
+    print("Script starting at %s\n" %
+          (datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC")))
+
+    if AV_SCAN_ALL_OBJECTS_S3_BUCKET is None or AV_SCAN_ALL_OBJECTS_S3_BUCKET_PREFIX is None:
+        print("You must define env variable AV_SCAN_ALL_OBJECTS_S3_BUCKET and AV_SCAN_ALL_OBJECTS_S3_BUCKET_PREFIX")
+        return
+
+    #update clamav definitions once
+    clamav.update_defs_from_s3(AV_DEFINITION_S3_BUCKET, AV_DEFINITION_S3_PREFIX)
+
+    bucket = s3.Bucket(AV_SCAN_ALL_OBJECTS_S3_BUCKET)
+    for obj in bucket.objects.filter(Prefix = AV_SCAN_ALL_OBJECTS_S3_BUCKET_PREFIX).page_size(AV_SCAN_ALL_OBJECTS_S3_PAGE_SIZE):
+
+        #verify if this object is not a folder
+        if not obj.key.endswith('/'):
+            #verify if this object was already processed
+            if not check_av_tag(bucket.name, obj.key):
+                print("processing object %s" % obj.key)
+                s3_object = get_S3_object(bucket.name, obj.key)
+                verify_s3_object_version(s3_object)
+                file_path = download_s3_object(s3_object, "/tmp")
+
+                scan_result = clamav.scan_file(file_path)
+                print("Scan of s3://%s resulted in %s\n" % (os.path.join(s3_object.bucket_name, s3_object.key), scan_result))
+
+                if "AV_UPDATE_METADATA" in os.environ:
+                    set_av_metadata(s3_object, scan_result)
+
+                set_av_tags(s3_object, scan_result)
+
+                # Delete downloaded file to free up room on re-usable lambda function container
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    print("ERROR - Fail removing file %s " % file_path)
+                    pass
+            else:
+                print("skipped obj %s -> av tag" % obj.key)
+        else:
+            print("skipped obj %s -> folder" % obj.key)
+
+    print("Script finished at %s\n" %
+          datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC"))
