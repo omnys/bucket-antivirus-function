@@ -133,22 +133,31 @@ def sns_start_scan(s3_object):
         MessageStructure="json"
     )
 
+
 def sns_scan_results(s3_object, result):
     if AV_STATUS_SNS_ARN is None:
         return
-    message = {
-        "bucket": s3_object.bucket_name,
-        "key": s3_object.key,
-        "version": s3_object.version_id,
-        AV_STATUS_METADATA: result,
-        AV_TIMESTAMP_METADATA: datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC")
-    }
-    sns_client = boto3.client("sns")
-    sns_client.publish(
-        TargetArn=AV_STATUS_SNS_ARN,
-        Message=json.dumps({'default': json.dumps(message)}),
-        MessageStructure="json"
-    )
+
+    sns_send = True
+    # should we check only for infected files result?
+    if str_to_bool(AV_STATUS_SNS_ONLY_INFECTED) and AV_STATUS_SNS_CLAMAV_CLEAN == result:
+        #scan result is positive => do not trigger status sns
+        sns_send = False
+
+    if sns_send:
+        message = {
+            "bucket": s3_object.bucket_name,
+            "key": s3_object.key,
+            AV_STATUS_METADATA: result,
+            AV_TIMESTAMP_METADATA: datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC")
+        }
+        sns_client = boto3.client("sns")
+        sns_client.publish(
+            TargetArn=AV_STATUS_SNS_ARN,
+            Message=json.dumps({'default': json.dumps(message)}),
+            MessageStructure="json"
+        )
+        print("SNS trigger for scan result sent to %s\n" % AV_STATUS_SNS_ARN)
 
 
 def lambda_handler(event, context):

@@ -29,6 +29,12 @@ or INFECTED, along with the date and time of the scan.
 - Metrics are sent to [DataDog](https://www.datadoghq.com/) (optional)
 - Scan results are published to a SNS topic (optional)
 
+### Complete bucket scan
+
+A second lambda function (lambda_handler_process_all_bucket_objects) can be used to scan all objects inside a bucket. It can be useful when you already have a bucket and you want to verify them for viruses and malware.
+- Be aware of max lambda function timeout in case you must process many objects. You can use custom filter prefix to limit objects number.
+- Evaluate costs before using this function. It will iterate all objects, skipping process for already tagged ones.
+
 ## Installation
 
 ### Build from Source
@@ -202,6 +208,11 @@ the table below for reference.
 | FRESHCLAM_PATH | Path to ClamAV freshclam binary | ./bin/freshclam | No |
 | DATADOG_API_KEY | API Key for pushing metrics to DataDog (optional) | | No |
 | AV_PROCESS_ORIGINAL_VERSION_ONLY | Controls that only original version of an S3 key is processed (if bucket versioning is enabled) | False | No |
+| AV_SCAN_ALL_OBJECTS_S3_BUCKET | Bucket name if you want to scan all bucket objects (lambda function lambda_handler_process_all_bucket_objects) | | No |
+| AV_SCAN_ALL_OBJECTS_S3_PAGE_SIZE | Bucket objects page size when the process iterate over all bucket objects (lambda function lambda_handler_process_all_bucket_objects) | 10 | No |
+| AV_SCAN_ALL_OBJECTS_S3_BUCKET_PREFIX | Object name prefix for filtering all bucket objects (lambda function lambda_handler_process_all_bucket_objects) | | No |
+| AV_STATUS_SNS_ONLY_INFECTED | Send sns status only for infected files | False | No |
+| AV_STATUS_SNS_CLAMAV_CLEAN | Clamav result string for clean files | CLEAN | No |
 
 
 ## S3 Bucket Policy Examples
