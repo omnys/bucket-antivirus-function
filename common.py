@@ -46,6 +46,7 @@ def create_dir(path):
         try:
             print("Attempting to create directory %s\n" % path)
             os.makedirs(path)
+            print("Directory created\n")
         except OSError as exc:
             if exc.errno != errno.EEXIST:
                 raise

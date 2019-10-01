@@ -72,14 +72,22 @@ def update_defs_from_freshclam(path, library_path=""):
         [
             FRESHCLAM_PATH,
             "--config-file=./bin/freshclam.conf",
+            "--verbose",
             "-u %s" % pwd.getpwuid(os.getuid())[0],
-            "--datadir=%s" % path
+            "--datadir=%s" % path,
         ],
-        stderr=STDOUT,
+        stderr=PIPE,
         stdout=PIPE,
-        env=fc_env
+        env=fc_env,
+        bufsize=1
     )
-    output = fc_proc.communicate()[0]
+    print("getting output:\n")
+    for line in iter(fc_proc.stdout.readline, b''):
+        print line,
+    fc_proc.stdout.close()
+    output = fc_proc.wait()
+
+    #output = fc_proc.communicate()[0]
     print("freshclam output:\n%s" % output)
     if fc_proc.returncode != 0:
         print("Unexpected exit code from freshclam: %s." % fc_proc.returncode)
@@ -131,7 +139,14 @@ def scan_file(path):
         stdout=PIPE,
         env=av_env
     )
-    output = av_proc.communicate()[0]
+    # output = av_proc.communicate()[0]
+
+    print("getting output:\n")
+    for line in iter(av_proc.stdout.readline, b''):
+        print line,
+    av_proc.stdout.close()
+    output = av_proc.wait()
+
     print("clamscan output:\n%s" % output)
     if av_proc.returncode == 0:
         return AV_STATUS_CLEAN
