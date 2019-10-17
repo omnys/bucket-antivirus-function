@@ -216,7 +216,16 @@ def lambda_handler_process_all_bucket_objects(event, context):
                 if "AV_UPDATE_METADATA" in os.environ:
                     set_av_metadata(s3_object, scan_result)
 
-                set_av_tags(s3_object, scan_result)
+                # handle case when an object is removed before the scan is completed
+                tag_obj = True
+                if AV_CHECK_FOR_FILE_BEFORE_TAGGING:
+                    try:
+                        get_S3_object(bucket.name, obj.key)
+                    except s3_client.exceptions.NoSuchKey:
+                        print("S3 object %s not found, skip tagging" % obj.key)
+                        tag_obj = False
+                if tag_obj:
+                    set_av_tags(s3_object, scan_result)
 
                 # Delete downloaded file to free up room on re-usable lambda function container
                 try:

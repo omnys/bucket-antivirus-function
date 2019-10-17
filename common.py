@@ -36,6 +36,7 @@ AV_DEFINITION_FILENAMES = ["main.cvd", "daily.cvd", "daily.cud", "bytecode.cvd",
 AV_SCAN_ALL_OBJECTS_S3_BUCKET = os.getenv("AV_SCAN_ALL_OBJECTS_S3_BUCKET")
 AV_SCAN_ALL_OBJECTS_S3_PAGE_SIZE = os.getenv("AV_SCAN_ALL_OBJECTS_S3_PAGE_SIZE", 10)
 AV_SCAN_ALL_OBJECTS_S3_BUCKET_PREFIX = os.getenv("AV_SCAN_ALL_OBJECTS_S3_BUCKET_PREFIX")
+AV_CHECK_FOR_FILE_BEFORE_TAGGING = os.getenv("AV_CHECK_FOR_FILE_BEFORE_TAGGING", False)
 
 s3 = boto3.resource('s3')
 s3_client = boto3.client('s3')
