@@ -174,17 +174,14 @@ def lambda_handler(event, context):
     if "AV_UPDATE_METADATA" in os.environ:
         set_av_metadata(s3_object, scan_result)
 
-    # handle case when an object is removed before the scan is completed
-    tag_obj = True
-    if AV_CHECK_FOR_FILE_BEFORE_TAGGING:
-        try:
-            event_object(event)
-        except s3_client.exceptions.NoSuchKey:
-            key = event['Records'][0]['s3']['object']['key'].encode('utf8')
-            print("S3 object %s not found, skip tagging" % key)
-            tag_obj = False
-    if tag_obj:
+    try:
         set_av_tags(s3_object, scan_result)
+    except s3_client.exceptions.NoSuchKey:
+        # handle case when an object is removed before the scan is completed
+        if AV_CHECK_FOR_FILE_BEFORE_TAGGING:
+            print("S3 object not found, skip tagging")
+        else:
+            raise Exception("We have a problem with obj tagging")
 
     sns_scan_results(s3_object, scan_result)
     metrics.send(env=ENV, bucket=s3_object.bucket_name, key=s3_object.key, status=scan_result)
