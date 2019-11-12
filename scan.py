@@ -173,7 +173,19 @@ def lambda_handler(event, context):
     print("Scan of s3://%s resulted in %s\n" % (os.path.join(s3_object.bucket_name, s3_object.key), scan_result))
     if "AV_UPDATE_METADATA" in os.environ:
         set_av_metadata(s3_object, scan_result)
-    set_av_tags(s3_object, scan_result)
+
+    # handle case when an object is removed before the scan is completed
+    tag_obj = True
+    if AV_CHECK_FOR_FILE_BEFORE_TAGGING:
+        try:
+            event_object(event)
+        except s3_client.exceptions.NoSuchKey:
+            key = event['Records'][0]['s3']['object']['key'].encode('utf8')
+            print("S3 object %s not found, skip tagging" % key)
+            tag_obj = False
+    if tag_obj:
+        set_av_tags(s3_object, scan_result)
+
     sns_scan_results(s3_object, scan_result)
     metrics.send(env=ENV, bucket=s3_object.bucket_name, key=s3_object.key, status=scan_result)
     # Delete downloaded file to free up room on re-usable lambda function container
